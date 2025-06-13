@@ -1,54 +1,56 @@
+from aiogram import Bot, Dispatcher, types
+from aiogram.enums import ParseMode
+from aiogram.types import Message, FSInputFile
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram import F
 import asyncio
 import logging
 import os
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, CallbackQuery, FSInputFile
-from aiogram.enums import ParseMode
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-TOKEN = "вставь_сюда_токен_бота"
+# Установим логгирование
+logging.basicConfig(level=logging.INFO)
 
+# Токен бота
+TOKEN = "7357980179:AAEb62G3UYAkwaxkATGfbqc0R_4hQb_QlGc"
+
+# Инициализация бота и диспетчера
 bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 
-# Клавиатура оплаты
-def get_payment_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💰 Оплатить 5 USDT (TRC20)", url="https://tronscan.org/#/address/TUVCh2u3gqwU8kfwzgjmJMUFPXTneFf9Kk")],
-        [InlineKeyboardButton(text="💰 Оплатить в TON", url="https://tonviewer.com/UQCBoBwjzbgw1eptiMrKbdpmX83al1qlaKFnUvI86zQnW4YP")],
-        [InlineKeyboardButton(text="✅ Я оплатил(а)", callback_data="paid")]
-    ])
+# PDF файл со схемами
+PDF_PATH = "Ultimate_Gray_Schemes.pdf"
 
+# Кнопки оплаты и шейринга
+def create_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="💸 Оплатить в USDT (TRC20)", url="https://tronscan.org/#/address/TUVCh2u3gqwU8kfwzgjmJMUFPXTneFf9Kk")
+    builder.button(text="💸 Оплатить в TON", url="https://tonviewer.com/UQCBoBwjzbgw1eptiMrKbdpmX83al1qlaKFnUvI86zQnW4YP")
+    builder.button(text="📄 Скачать PDF", callback_data="get_pdf")
+    builder.button(text="🚀 Расшарить", switch_inline_query="")
+    return builder.as_markup()
+
+# Обработка /start
 @dp.message(F.text == "/start")
-async def start_handler(message: Message):
-    await message.answer(
-        """<i>🧠 Это не попрошайничество. Это — продажа серой информации.
-
-Ты получаешь PDF с рабочими серыми схемами.
-
-📉 Цена: всего 5 USDT или эквивалент в TON.
-📈 Счётчик: уже <b>134</b> человек приобрели сегодня.
-
-👇 Жми кнопку ниже, чтобы оплатить и получить PDF.</i>""",
-        reply_markup=get_payment_keyboard()
+async def cmd_start(message: Message):
+    text = (
+        "<b>🧠 Это не попрошайничество.</b>\n"
+        "<i>Это — продажа серой информации. Ты либо пользуешься ей, либо проходишь мимо.</i>\n\n"
+        "Внутри PDF — самые жёсткие схемы и фишки.\n"
+        "Никаких оправданий. Только действие."
     )
+    await message.answer(text, reply_markup=create_keyboard())
 
-@dp.callback_query(F.data == "paid")
-async def paid_callback(callback: CallbackQuery):
-    pdf_path = "Ultimate_Gray_Schemes.pdf"
-    if os.path.exists(pdf_path):
-        await callback.message.answer_document(FSInputFile(pdf_path))
-        await callback.answer("✅ Файл отправлен", show_alert=True)
-    else:
-        await callback.answer("❌ PDF не найден. Свяжитесь с поддержкой.", show_alert=True)
+# Обработка запроса PDF
+@dp.callback_query(F.data == "get_pdf")
+async def send_pdf(callback_query: types.CallbackQuery):
+    pdf_file = FSInputFile(PDF_PATH)
+    await callback_query.message.answer_document(pdf_file)
+    await callback_query.answer()
 
-@dp.message(F.text.lower().startswith("история"))
-async def history_handler(message: Message):
-    await message.answer(
-        "<b>История</b>\n\nЭтот проект — ультимативная попытка монетизировать серый опыт. Ты не просто получаешь PDF — ты входишь в игру, где всё зависит от твоей решимости. Действуй — или останешься ни с чем.",
-        parse_mode="HTML"
-    )
+# Основной запуск
+async def main():
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    asyncio.run(dp.start_polling(bot))
+    asyncio.run(main())
