@@ -1,78 +1,86 @@
-import os
 import asyncio
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.enums import ParseMode
-from aiogram.filters import Command
-from aiogram.types import (
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    FSInputFile,
-)
+import logging
+import random
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils import executor
 
-TOKEN = os.getenv("BOT_TOKEN")
-bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
-dp = Dispatcher()
+API_TOKEN = "YOUR_BOT_TOKEN_HERE"
 
-# 📌 Главное меню с 4 кнопками
-main_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="📜 История", callback_data="history")],
-    [InlineKeyboardButton(text="💸 Поддержать", url="https://t.me/GrayKitBot")],
-    [InlineKeyboardButton(text="📄 PDF", callback_data="pdf")],
-    [InlineKeyboardButton(text="📥 Как получить?", callback_data="how_to_get")],
-])
+logging.basicConfig(level=logging.INFO)
 
-# 🟢 /start
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(bot)
+
+pdf_file_path = "gray_schemes_guide.pdf"
+usdt_wallet = "TXkJ6dEkz5EmU7KoVRJMeFnBbc5kctiZAA"
+ton_wallet = "EQDvKf-6l17S09Y0Eklufy8qL83DKxhJz7g1fIPhuykC5-bF"
+
+fake_sales = 124
+fake_remaining = 7
+
+async def periodic_fake_updates():
+    global fake_sales, fake_remaining
+    while True:
+        await asyncio.sleep(random.randint(180, 300))  # 3–5 минут
+        if fake_remaining > 1:
+            fake_sales += 1
+            fake_remaining -= 1
+
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        InlineKeyboardButton("💸 Купить за 5 USDT", callback_data="buy_usdt"),
+        InlineKeyboardButton("💰 Купить за TON", callback_data="buy_ton"),
+        InlineKeyboardButton("📄 Описание PDF", callback_data="description")
+    )
+
     await message.answer(
-        "Добро пожаловать в проект GrayKitBot!\n\nВыберите действие 👇",
-        reply_markup=main_keyboard
+        f"🕵️ Ты получил доступ к закрытой базе серых схем.\n"
+        f"⚠️ Осталось: {fake_remaining} копий\n"
+        f"💬 {fake_sales} человек уже купили PDF за последние 48 часов.",
+        reply_markup=keyboard
     )
 
-# 📜 История
-@dp.callback_query(F.data == "history")
-async def show_history(callback: types.CallbackQuery):
-    await callback.message.answer(
-        "<b>📜 История челленджа:</b>\n\n"
-        "Ты смотришь на историю создания проекта. Это начало."
+    await asyncio.sleep(30)
+    await message.answer("🕔 Время идёт. Осталось 6 копий. Получи PDF сейчас — или упустишь.")
+
+@dp.callback_query_handler(lambda c: c.data == 'buy_usdt')
+async def process_buy_usdt(callback_query: types.CallbackQuery):
+    await callback_query.answer()
+    await bot.send_message(
+        callback_query.from_user.id,
+        f"💸 Переведи 5 USDT (TRC20) на адрес:\n`{usdt_wallet}`\n"
+        f"После оплаты PDF будет выслан в течение 1–3 минут."
     )
-    await callback.answer()
 
-# 📄 PDF
-@dp.callback_query(F.data == "pdf")
-async def send_pdf(callback: types.CallbackQuery):
-    try:
-        pdf_path = "challenge.pdf"
-        pdf_file = FSInputFile(pdf_path)
-        await callback.message.answer_document(pdf_file, caption="📄 Вот файл челленджа")
-    except FileNotFoundError:
-        await callback.message.answer("Файл PDF не найден.")
-    await callback.answer()
-
-# 📥 Как получить?
-@dp.callback_query(F.data == "how_to_get")
-async def how_to_get(callback: types.CallbackQuery):
-    await callback.message.answer(
-        "<b>📥 Как получить файл?</b>\n\n"
-        "Просто нажми на кнопку 📄 PDF выше — и бот отправит тебе файл.\n\n"
-        "Если кнопка не работает — файл еще не загружен в систему."
+@dp.callback_query_handler(lambda c: c.data == 'buy_ton')
+async def process_buy_ton(callback_query: types.CallbackQuery):
+    await callback_query.answer()
+    await bot.send_message(
+        callback_query.from_user.id,
+        f"💰 Переведи эквивалент 5 USDT в TON на адрес:\n`{ton_wallet}`\n"
+        f"После оплаты PDF будет выслан в течение 1–3 минут."
     )
-    await callback.answer()
 
-# /share
-@dp.message(Command("share"))
-async def share_cmd(message: types.Message):
-    share_text = (
-        "🚨 Новый челлендж!\n\n"
-        "Поддержи проект GrayKit — анонимно, быстро и с пользой.\n"
-        "👉 https://t.me/GrayKitBot\n\n"
-        "#донат #челлендж #анонимно"
+@dp.callback_query_handler(lambda c: c.data == 'description')
+async def process_description(callback_query: types.CallbackQuery):
+    await callback_query.answer()
+    await bot.send_message(
+        callback_query.from_user.id,
+        "📄 Внутри PDF ты найдёшь:\n"
+        "1. Серые схемы Telegram и Instagram\n"
+        "2. Алгоритмы прогрева\n"
+        "3. Подпольные лендинги и вирусные автоворонки\n"
+        "4. Примеры текстов, офферов, доминов\n"
+        "5. Гайды по трафику и перепродаже\n\n"
+        "Цена — 5 USDT или TON."
     )
-    await message.answer(share_text)
 
-# 🔁 Старт бота
 async def main():
-    await dp.start_polling(bot)
+    asyncio.create_task(periodic_fake_updates())
+    await dp.start_polling()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main())
