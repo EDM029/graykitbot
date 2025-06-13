@@ -1,56 +1,47 @@
+import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
-from aiogram.types import Message, FSInputFile
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram import F
-import asyncio
-import logging
-import os
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.filters import CommandStart
+from aiogram.utils.markdown import hbold
+import aiofiles
+from datetime import datetime
 
-# Установим логгирование
-logging.basicConfig(level=logging.INFO)
-
-# Токен бота
 TOKEN = "7357980179:AAEb62G3UYAkwaxkATGfbqc0R_4hQb_QlGc"
 
-# Инициализация бота и диспетчера
 bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
-dp = Dispatcher(storage=MemoryStorage())
+dp = Dispatcher()
 
-# PDF файл со схемами
-PDF_PATH = "Ultimate_Gray_Schemes.pdf"
+# Кнопки оплаты
+payment_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="💸 Оплатить 2 TON", url="https://tonkeeper.com/transfer/UQCBoBwjzbgw1eptiMrKbdpmX83al1qlaKFnUvI86zQnW4YP?amount=2")],
+    [InlineKeyboardButton(text="💸 Оплатить 5 USDT (TRC20)", url="https://tronscan.org/#/address/TUVCh2u3gqwU8kfwzgjmJMUFPXTneFf9Kk")],
+])
 
-# Кнопки оплаты и шейринга
-def create_keyboard():
-    builder = InlineKeyboardBuilder()
-    builder.button(text="💸 Оплатить в USDT (TRC20)", url="https://tronscan.org/#/address/TUVCh2u3gqwU8kfwzgjmJMUFPXTneFf9Kk")
-    builder.button(text="💸 Оплатить в TON", url="https://tonviewer.com/UQCBoBwjzbgw1eptiMrKbdpmX83al1qlaKFnUvI86zQnW4YP")
-    builder.button(text="📄 Скачать PDF", callback_data="get_pdf")
-    builder.button(text="🚀 Расшарить", switch_inline_query="")
-    return builder.as_markup()
-
-# Обработка /start
-@dp.message(F.text == "/start")
-async def cmd_start(message: Message):
-    text = (
-        "<b>🧠 Это не попрошайничество.</b>\n"
-        "<i>Это — продажа серой информации. Ты либо пользуешься ей, либо проходишь мимо.</i>\n\n"
-        "Внутри PDF — самые жёсткие схемы и фишки.\n"
-        "Никаких оправданий. Только действие."
+@dp.message(CommandStart())
+async def start(message: types.Message):
+    await message.answer(
+        "<b>🧠 Это не попрошайничество. Это — продажа серой информации.</b>\n\n"
+        "🚫 Больше не будет бесплатных PDF-файлов. Только платный доступ.\n"
+        "🔥 Уже более 130+ человек скачали. Осталось всего <b>17 копий</b>.\n\n"
+        "💥 Никакой воды. Только серые схемы, которые можно применить сразу.\n"
+        "💰 Оплата через TON или USDT. После — отправь хеш (txid), чтобы получить файл вручную.\n\n"
+        "👇 Выбери способ оплаты:",
+        reply_markup=payment_keyboard
     )
-    await message.answer(text, reply_markup=create_keyboard())
 
-# Обработка запроса PDF
-@dp.callback_query(F.data == "get_pdf")
-async def send_pdf(callback_query: types.CallbackQuery):
-    pdf_file = FSInputFile(PDF_PATH)
-    await callback_query.message.answer_document(pdf_file)
-    await callback_query.answer()
+@dp.message()
+async def handle_txid(message: types.Message):
+    txid = message.text.strip()
+    user_id = message.from_user.id
+    username = message.from_user.username or "no_username"
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Основной запуск
-async def main():
-    await dp.start_polling(bot)
+    async with aiofiles.open("payments.txt", mode="a") as f:
+        await f.write(f"{now} | ID: {user_id} | @{username} | TXID: {txid}\n")
+
+    await message.reply("✅ Твой хеш сохранён. Мы проверим и отправим PDF вручную в ближайшее время.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    logging.basicConfig(level=logging.INFO)
+    dp.run_polling(bot)
